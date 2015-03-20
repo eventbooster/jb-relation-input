@@ -1,0 +1,27 @@
+{
+	"name"			: "jb-relation-input"
+	, "version"		: "0.0.1"
+	, "main"		: "src/jb-relation-input.js"
+	, "dependencies": {
+		"angular"	: ">=1.3.0"
+	}
+	, "ignore"		: [
+		"tests"
+		, "js"
+		, "bower.json"
+		, "README.md"
+		, "LICENSE"
+	]
+	, "license"		: "MIT"
+	, "authors"		: [
+		{ 
+			"name"			: "Felix Steiner"
+			, "email"		: "felix@joinbox.com"
+			, "homepage"	: "http://joinbox.com" 
+		}
+	]
+	, "repository"	: {
+		"type"		: "git"
+		, "url"		: "git://github.com/joinbox/jb-relation-input.git"
+	}
+}
