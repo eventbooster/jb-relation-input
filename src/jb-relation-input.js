@@ -2,6 +2,8 @@
 * Input (typeahead) for getting entities from the server. Made for the Distributed framework.
 */
 
+'use strict';
+
 angular
 .module( 'jb.relationInput', [ 'eb.apiWrapper' ] )
 .directive( 'relationInput', [ function() {
@@ -14,6 +16,7 @@ angular
 		}
 		, scope				: {}
 		, templateUrl		: 'relationInputTemplate.html'
+		, replace			: true
 	};
 
 } ] )
@@ -25,6 +28,8 @@ angular
 		, modelCtrl
 		, open		= false;
 
+	// Namespace for clickhandlers (outside of input to inactivate it); needed to remove them after
+	// input is not active any more.
 	var eventNamespace = ( Math.random() + '' ).replace( '.', '' ).substring( 1, 15 );
 
 	// URL to get suggestions from
@@ -39,8 +44,11 @@ angular
 
 	self.isMultiSelect			= $attrs.multiSelect === 'true' ? true : false;
 
+
+
 	// May the relations be deleted?
 	$scope.deletable			= $scope.$parent.$eval( $attrs.deletable );
+	$scope.isInteractive		= $attrs.relationInteractive === 'true' ? true : false;
 
 
 
@@ -51,6 +59,7 @@ angular
 			console.error( 'RealtinInput: Missing %s, is mandatory', requiredField );
 		}
 	} );
+
 
 	// Make URLs public for «edit» and «new» buttons
 	$scope.newEntityUrl		= self.entityUrl;
@@ -251,17 +260,19 @@ angular
 
 
 
-.run( function( $templateCache ) {
+.run( ['$templateCache', function( $templateCache ) {
 
 	$templateCache.put( 'relationInputTemplate.html',
-		'<div data-relation-input-selected-entities></div>' +
-		'<div data-relation-input-suggestions></div>' +
-		'<div clearfix>' +
-			'<a data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
+		'<div>' +
+			'<div data-relation-input-selected-entities></div>' +
+			'<div data-relation-input-suggestions></div>' +
+			'<div clearfix data-ng-if=\'isInteractive\'>' +
+				'<a data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
+			'</div>' +
 		'</div>'
 	);
 
-} )
+} ] )
 
 
 
@@ -307,6 +318,7 @@ angular
 	$scope.searchQuery	= undefined;
 
 	$scope.$watch( 'searchQuery', function( newValue ) {
+		console.log( $scope.searchQuery );
 		self.getData( newValue );
 	} );
 
@@ -398,6 +410,8 @@ angular
 		resultTpl = resultTpl.replace( /\[\[(\s*)(((?!\]\]).)*)\]\]/gi, function( res, space, name ) {
 			return '{{ result.' + name + ' }}';
 		} );
+
+		console.log( 'RelationInputController: Render template %o', resultTpl );
 
 		var tpl = $( $templateCache.get( 'relationInputSuggestionsTemplate.html' ) );
 		tpl.find( 'li' ).append( resultTpl );
@@ -506,7 +520,7 @@ angular
 			, filter			= filterField + '=like(\'%' + query + '%\')'
 			, selectFields		= self.getSelectFields();
 
-		console.log( 'RelationInput: request %s:%s, filter %o, select %o', relationInputController.entityUrl, filter, selectFields.join( ',' ) );
+		console.log( 'RelationInput: request %s, filter %o, select %o', relationInputController.entityUrl, filter, selectFields.join( ',' ) );
 
 		APIWrapperService.request( {
 			url				: relationInputController.entityUrl
@@ -581,7 +595,7 @@ angular
 			}
 		}
 		else {
-
+			// Nothing to do; no elements need to be removed as noone can be selected
 		}
 
 		if( $scope.results.length > 0 ) {
@@ -595,10 +609,10 @@ angular
 } ] )
 
 
-.run( function( $templateCache ) {
+.run( [ '$templateCache', function( $templateCache ) {
 
 	$templateCache.put( 'relationInputSuggestionsTemplate.html',
-		'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' +
+		'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' + 
 			'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
 			'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
 				'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
@@ -611,7 +625,7 @@ angular
 		'</div>'
 	);
 
-} )
+} ] )
 
 
 
@@ -764,7 +778,9 @@ angular
 } ] )
 
 
-.run( function( $templateCache ) {
+.run( [ '$templateCache', function( $templateCache ) {
+
+	console.error( $templateCache.get( 'relationInputSelectedEntitiesTemplate.html' ) );
 
 	$templateCache.put( 'relationInputSelectedEntitiesTemplate.html',
 		'<div class=\'selected-entities\' data-ng-class=\'{ "single-select": !isMultiSelect }\'>' +
@@ -773,12 +789,12 @@ angular
 				// use result for the loop as in the suggestion directive so that we may use the same template
 				'<li data-ng-repeat=\'result in entities\' data-ng-class=\'{empty: !result.name}\'>' +
 				'<span><!-- see renderTemplate() --></span>' +
-				'<button data-ng-click=\'visitEntity($event, result)\'><span class=\'fa fa-pencil\'></span></button>' +
+				'<button data-ng-if=\'isInteractive\' data-ng-click=\'visitEntity($event, result)\'><span class=\'fa fa-pencil\'></span></button>' +
 				'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
 				'</li>' +
 			'</ul>' +
 		'</div>'
 	);
 
-} );
+} ] );
 
