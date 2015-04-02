@@ -10,13 +10,13 @@ angular
 
 	return {
 		require				: [ 'relationInput', 'ngModel' ]
+		, replace			: true
 		, controller		: 'RelationInputController'
 		, link				: function( scope, element, attrs, ctrl ) {
 			ctrl[ 0 ].init( element, ctrl[ 1 ] );
 		}
 		, scope				: {}
 		, templateUrl		: 'relationInputTemplate.html'
-		, replace			: true
 	};
 
 } ] )
@@ -89,6 +89,7 @@ angular
 	self.init = function( el, model ) {
 		element		= el;
 		modelCtrl	= model;
+		self.setupEventListeners();
 		console.log( 'RelationInput: model is %o on init', model );
 	};
 
@@ -191,7 +192,6 @@ angular
 
 	// Watch for events, called from within init
 	self.setupEventListeners = function() {
-
 		// Open & close: 
 		// Watch for events here (instead of suggestion), as most events happen
 		// on this directive's element (and not the one of suggestion)
@@ -208,6 +208,10 @@ angular
 			} );
 		} );
 
+		$scope.$on( '$destroy', function() {
+			// Remove all listeners
+		} );
+
 		setupInputBlurHandler();
 
 	};
@@ -220,13 +224,14 @@ angular
 	* Blur on the input: Hide after some ms (that are needed for a click handler to fire first)
 	*/
 	function setupInputBlurHandler() {
+	/*	console.error( element );
 		element.find( '.entity-suggestions input' ).blur( function( ev ) {
 			setTimeout( function() {
 				$scope.$apply( function() {
 					open = false;
 				} );
 			}, 100 );
-		} );
+		} );*/
 	}
 
 	/**
@@ -672,7 +677,7 @@ angular
 		// eventListener of relationInput looks for events happening in this directive
 		// therefore wait with setting them up until this directive is ready and it's template
 		// is rendered
-		relationInputController.setupEventListeners();
+		//relationInputController.setupEventListeners();
 		$scope.isMultiSelect = relationInputController.isMultiSelect;
 
 		self.renderTemplate();
@@ -779,8 +784,6 @@ angular
 
 
 .run( [ '$templateCache', function( $templateCache ) {
-
-	console.error( $templateCache.get( 'relationInputSelectedEntitiesTemplate.html' ) );
 
 	$templateCache.put( 'relationInputSelectedEntitiesTemplate.html',
 		'<div class=\'selected-entities\' data-ng-class=\'{ "single-select": !isMultiSelect }\'>' +
