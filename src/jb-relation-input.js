@@ -618,7 +618,7 @@ angular
 
 	$templateCache.put( 'relationInputSuggestionsTemplate.html',
 		'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' + 
-			'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
+			'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' data-ng-model-options=\'{"debounce":{"default":200}}\' />' +
 			'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
 				'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
 			'</div>' +
