@@ -528,7 +528,7 @@
 			$scope.loading = true;
 
 			var filterField			= relationInputController.searchField
-				, filter			= ';;' + filterField + '=like(\'' + encodeURIComponent( '%' + query + '%' ) + '\')' // Unicode hack
+				, filter			= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')' // Unicode hack
 				, selectFields		= self.getSelectFields();
 
 			console.log( 'RelationInput: query %o, request %s, filter %o, select %o', query, relationInputController.entityUrl, filter, selectFields.join( ',' ) );
