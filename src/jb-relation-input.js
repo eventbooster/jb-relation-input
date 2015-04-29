@@ -47,6 +47,7 @@
 
 		self.isMultiSelect			= $attrs.multiSelect === 'true' ? true : false;
 
+		self.resultCount			= $attrs.resultCount || 10;
 
 
 		// May the relations be deleted?
@@ -539,7 +540,7 @@
 				, headers		: {
 					filter		: filter
 					, select	: selectFields.join( ',' )
-					, range		: '0-10'
+					, range		: '0-' + relationInputController.resultCount
 				}
 			} )
 			.then( function( data ) {
