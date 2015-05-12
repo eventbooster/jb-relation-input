@@ -654,7 +654,7 @@
 	.run( [ '$templateCache', function( $templateCache ) {
 
 		$templateCache.put( 'relationInputSuggestionsTemplate.html',
-			'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\' style=\'border:3px solid red;background-color:blue;\'>' + 
+			'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' + 
 				'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
 				'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
 					'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
