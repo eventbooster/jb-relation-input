@@ -2,7 +2,6 @@
 * Input (typeahead) for getting entities from the server. Made for the Distributed framework.
 */
 ( function() {
-
 	'use strict';
 
 	angular
@@ -120,8 +119,9 @@
 
 		self.addRelation = function( entity ) {
 
-			// Update entities (will be displayed in selected-entities)
+			console.log( 'RelationInputController: Add relation %o', entity );			
 
+			// Update entities (will be displayed in selected-entities)
 			// Update model
 			if( !self.isMultiSelect ) {
 				modelCtrl.$setViewValue( [ entity ] );
@@ -138,6 +138,8 @@
 
 
 		self.removeRelation = function( entity ) {
+
+			console.log( 'RelationInputController: Remove relation %o', entity );
 
 			if( self.isMultiSelect ) {
 				var originalData = modelCtrl.$modelValue;
@@ -167,17 +169,15 @@
 		//
 
 
+		self.setOpen = function( isOpen ) {
 
+			// Set private variable
+			open = isOpen;
 
-
-		//
-		// Open?
-		//
-		self.isOpen = function() {
 			// If we're open, remove the input field that catches the focus or the
 			// user may not go one input field back (shift-tab)
 			var focusInput = element.find( '.selected-entities input' );
-			if( open ) {
+			if( isOpen ) {
 				focusInput.hide();
 				setupDocumentClickHandler();
 			}
@@ -185,6 +185,17 @@
 				focusInput.show();
 				removeDocumentClickHandler();
 			}
+
+			$scope.$broadcast( 'openChange', open );
+
+		};
+
+
+		//
+		// Open?
+		// Is used in RelationInputSuggestionsController to check if suggestions are open.
+		//
+		self.isOpen = function() {
 			return open;
 		};
 
@@ -199,19 +210,22 @@
 
 		// Watch for events, called from within init
 		self.setupEventListeners = function() {
+			
 			// Open & close: 
 			// Watch for events here (instead of suggestion), as most events happen
 			// on this directive's element (and not the one of suggestion)
 
 			$scope.$on( 'relationInputFieldFocus', function() {
 				$scope.$apply( function() {
-					open = true;
+					self.setOpen( true );
 				} );
 			} );
 
+			// Click on selected entities: Open/Close input
 			$scope.$on( 'relationInputSelectedEntitiesClick', function() {
 				$scope.$apply( function() {
-					open = !open;
+					console.log( 'RelationInputController: Clicked selected entities, set open to %o', true );
+					self.setOpen( true );
 				} );
 			} );
 
@@ -241,6 +255,8 @@
 			} );*/
 		}
 
+
+
 		/**
 		* Click on document: Is element.entity-suggestions above the element that was clicked?
 		* If not, close
@@ -255,11 +271,12 @@
 
 				if( $( ev.target ).closest( element.find( '.entity-suggestions') ).length === 0 ) {
 					$scope.$apply( function() {
-						open = false;
+						self.setOpen( false );
 					} );
 				}
 			} );
 		}
+
 
 		/**
 		* Remove document.click handler
@@ -267,6 +284,7 @@
 		function removeDocumentClickHandler() {
 			$( document ).off( 'click.' + eventNamespace );
 		}
+
 
 	} ] )
 
@@ -393,14 +411,27 @@
 		* Returns true if suggestions should be displayed; sets focus on input
 		*/
 		$scope.isOpen = function() {
+
+			var open = relationInputController.isOpen();
+			console.log( 'RelationInputSuggestionsController: Open is %o', open );
+			return open;
+
+		};
+
+
+		$scope.$on( 'openChange', function() {
+
 			var open = relationInputController.isOpen();
 			if( open ) {
+				console.log( 'RelationInputSuggestionsController: Is open; focus input.' );
 				setTimeout( function() {
-					element.find( 'input' ).focus();
+					var input = element.find( 'input' );
+					input.focus();
+					console.log( 'RelationInputSuggestionsController: Focussed input %o.', input );
 				}, 100 );
 			}
-			return open;
-		};
+
+		} );
 
 
 
@@ -444,7 +475,6 @@
 		self.setupEventListeners = function() {
 
 			// If we use keyup, enter will only fire once (wtf?)
-
 			element.find( 'input' ).keydown( function( ev ) {
 
 				if( [ 40, 38, 13 ].indexOf( ev.which ) === -1 ) {
@@ -624,8 +654,8 @@
 	.run( [ '$templateCache', function( $templateCache ) {
 
 		$templateCache.put( 'relationInputSuggestionsTemplate.html',
-			'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' + 
-				'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' data-ng-model-options=\'{"debounce":{"default":200}}\' />' +
+			'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\' style=\'border:3px solid red;background-color:blue;\'>' + 
+				'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
 				'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
 					'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
 				'</div>' +
@@ -718,8 +748,9 @@
 
 			// Focus on (hidden) input: Show suggestions
 			element.find( 'input' ).focus( function() {
-					$scope.$emit( 'relationInputFieldFocus' );
-				} );
+				console.log( 'RelationInputSelectedEntitiesController: (Hidden) input focussed.' );
+				$scope.$emit( 'relationInputFieldFocus' );
+			} );
 
 			// Click on element
 			element.click( function() {
