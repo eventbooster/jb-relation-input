@@ -102,7 +102,7 @@
 			modelCtrl.$render = function() {
 
 				var value = modelCtrl.$viewValue;
-				console.error( 'RelationInput: caught modelCtrl modelValue change ($render); is now %o', value );
+				console.log( 'RelationInput: caught modelCtrl modelValue change ($render); is now %o', value );
 				if( !angular.isArray( value ) ) {
 					value = [ value ];
 				}
