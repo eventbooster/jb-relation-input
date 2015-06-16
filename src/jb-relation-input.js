@@ -59,7 +59,7 @@
 		var requiredFields = [ 'entityUrl', 'searchResultTemplate', 'searchField' ];
 		requiredFields.forEach( function( requiredField ) {
 			if( !self[ requiredField ] ) {
-				console.error( 'RealtinInput: Missing %s, is mandatory', requiredField );
+				console.error( 'RelationInput: Missing %s, is mandatory', requiredField );
 			}
 		} );
 
@@ -73,18 +73,8 @@
 		// -> one way binding
 		$scope.entities		= undefined;
 
-		$scope.$watch( function() {
-			return modelCtrl.$modelValue;
-		}, function( newValue ) {
-			if( !angular.isArray( newValue ) ) {
-				newValue = [ newValue ];
-			}
-			console.log( 'RelationInput: caught modelCtrl modelValue change; is now %o', newValue );
-			$scope.entities			= newValue;
-		} );
 
-
-
+		
 
 
 
@@ -96,12 +86,31 @@
 			element		= el;
 			modelCtrl	= model;
 			self.setupEventListeners();
+			self.setupModelCtrlRenderer();
 			console.log( 'RelationInput: model is %o on init', model );
 		};
 
 
 
 
+
+		/**
+		* Watch for changes on viewModel
+		*/
+		self.setupModelCtrlRenderer = function() {
+
+			modelCtrl.$render = function() {
+
+				var value = modelCtrl.$viewValue;
+				console.error( 'RelationInput: caught modelCtrl modelValue change ($render); is now %o', value );
+				if( !angular.isArray( value ) ) {
+					value = [ value ];
+				}
+				$scope.entities = value;
+
+			};
+
+		};
 
 
 
@@ -124,11 +133,13 @@
 			// Update entities (will be displayed in selected-entities)
 			// Update model
 			if( !self.isMultiSelect ) {
+				console.log( 'RelationInputController: Set model to %o', [ entity ] );
 				modelCtrl.$setViewValue( [ entity ] );
 			}
 			else {
 				var currentData = ( modelCtrl.$modelValue && angular.isArray( modelCtrl.$modelValue ) ) ? modelCtrl.$modelValue.slice() : [];
 				currentData.push( entity );
+				console.log( 'RelationInputController: Set model to %o', currentData );
 				modelCtrl.$setViewValue( currentData );
 			}
 
