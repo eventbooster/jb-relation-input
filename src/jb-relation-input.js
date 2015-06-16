@@ -73,8 +73,21 @@
 		// -> one way binding
 		$scope.entities		= undefined;
 
+		// We can't use $render instead of $scope.$watch
+		// as it does not support deep watching and the
+		// model is usually an object.
+		$scope.$watch( function() {
+			return modelCtrl.$modelValue;
+		}, function( newValue ) {
+			if( !angular.isArray( newValue ) ) {
+				newValue = [ newValue ];
+			}
+			console.log( 'RelationInput: caught modelCtrl modelValue change; is now %o', newValue );
+			$scope.entities			= newValue;
+		} );
 
-		
+
+
 
 
 
@@ -86,31 +99,12 @@
 			element		= el;
 			modelCtrl	= model;
 			self.setupEventListeners();
-			self.setupModelCtrlRenderer();
 			console.log( 'RelationInput: model is %o on init', model );
 		};
 
 
 
 
-
-		/**
-		* Watch for changes on viewModel
-		*/
-		self.setupModelCtrlRenderer = function() {
-
-			modelCtrl.$render = function() {
-
-				var value = modelCtrl.$viewValue;
-				console.log( 'RelationInput: caught modelCtrl modelValue change ($render); is now %o', value );
-				if( !angular.isArray( value ) ) {
-					value = [ value ];
-				}
-				$scope.entities = value;
-
-			};
-
-		};
 
 
 
