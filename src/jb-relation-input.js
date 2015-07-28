@@ -329,6 +329,11 @@
 
 
 
+		// Holds the data that is displayed if no query was entered (default values). 
+		// Data is gotten when relation-input is being initialized.
+		$scope.emptyQueryResults = undefined;
+
+
 		//
 		// Seach query
 		//
@@ -351,8 +356,12 @@
 			// Propagate to relationInputController that updates the model
 			relationInputController.addRelation( result );
 
-			$scope.results			= [];
+			// Default results: self.emptyQueryResults
+			$scope.results			= $scope.emptyQueryResults ? $scope.emptyQueryResults.slice( 0 ) : [];
+
+			// Reset value of input and searchQuery
 			$scope.searchQuery		= '';
+			element.find( 'input' ).val( '' );
 
 		};
 
@@ -401,12 +410,15 @@
 		$scope.isOpen = function() {
 
 			var open = relationInputController.isOpen();
-			console.log( 'RelationInputSuggestionsController: Open is %o', open );
+			//console.log( 'RelationInputSuggestionsController: Open is %o', open );
 			return open;
 
 		};
 
 
+		/**
+		* Open is set on relationInput: Take it from there.
+		*/
 		$scope.$on( 'openChange', function() {
 
 			var open = relationInputController.isOpen();
@@ -514,6 +526,8 @@
 
 		};
 
+
+
 		// User presses enter
 		self.addSelected = function( ev ) {
 			
@@ -541,40 +555,75 @@
 
 			$scope.results = [];
 
-			if( !query ) {
+
+			// No search query was entered, but emptyQueryResults was set before: No need to make a call,
+			// just display the results for empty queries gotten on init. 
+			if( !query && $scope.emptyQueryResults ) {
+
+				// Clone data (we don't want emptyQueryResults to be changed whenever data changes)
+				$scope.results = $scope.emptyQueryResults; //.slice( 0 );
+				self.filterResults();
+
 				return;
+
 			}
+
+
 
 			$scope.loading = true;
 
-			var filterField			= relationInputController.searchField
-				, filter			= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')' // Unicode hack
-				, selectFields		= self.getSelectFields();
 
-			console.log( 'RelationInput: query %o, request %s, filter %o, select %o', query, relationInputController.entityUrl, filter, selectFields.join( ',' ) );
+			// COMPOSE HEADER FIELDS
+			var headers		= {
+				range		: '0-' + relationInputController.resultCount
+			};
 
+			// Filter header
+			if( query ) {
+	
+				var filterField			= relationInputController.searchField
+					, filter			= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')'; // ;;: Unicode hack
+
+				headers.filter			= filter;
+
+			}
+			
+			// Select header
+			var selectFields			= self.getSelectFields();
+			if( selectFields && selectFields.length ) {
+				headers.select			=  selectFields.join( ',' );
+			}
+
+			console.log( 'RelationInput: query %o, request %s, headers %o', query, relationInputController.entityUrl, headers );
+
+
+
+			// MAKE REQUEST
 			APIWrapperService.request( {
 				url				: relationInputController.entityUrl
 				, method		: 'GET'
-				, headers		: {
-					filter		: filter
-					, select	: selectFields.join( ',' )
-					, range		: '0-' + relationInputController.resultCount
-				}
+				, headers		: headers
 			} )
 			.then( function( data ) {
+
 				$scope.loading	= false;
 				$scope.results = data;
 				self.filterResults();
-				/*if( $scope.results.length > 0 ) {
-					$scope.selected = $scope.results[ 0 ];
-				}*/
+
+				if( !query ) {
+					$scope.emptyQueryResults = data;
+				}
+
 			}, function( err ) {
 				$scope.loading	= false;
 				$rootScope.$broadcast( 'notification', { type: 'error', message: 'web.backoffice.detail.loadingError', variables: { errorMessage: err } } );
 			} );
 
+
 		};
+
+
+
 
 
 
@@ -604,7 +653,7 @@
 
 		/**
 		* Updates $scope.results: Removes all entities that are already selected
-		* Then updates selected (as it may have been removed)
+		* Then updates selected (i.e. the currently hovered entry – as it may have been removed)
 		*/
 		self.filterResults = function() {
 
@@ -637,7 +686,13 @@
 
 		};
 
+
+
+
+
 	} ] )
+
+
 
 
 	.run( [ '$templateCache', function( $templateCache ) {
