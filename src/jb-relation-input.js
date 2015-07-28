@@ -1,5 +1,6 @@
 /**
 * Input (typeahead) for getting entities from the server. Made for the Distributed framework.
+* ATTENTION: bindToController newly introduced, might cause problems. Needs testing.
 */
 ( function() {
 	'use strict';
@@ -9,15 +10,17 @@
 	.directive( 'relationInput', [ function() {
 
 		return {
-			require				: [ 'relationInput', 'ngModel' ]
+			require				: [ 'relationInput' ]
 			, replace			: true
 			, controller		: 'RelationInputController'
 			, bindToController	: true
 			, controllerAs		: 'relationInput'
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl[ 0 ].init( element );
 			}
-			, scope				: {}
+			, scope				: {
+				entities		: '=ngModel'
+			}
 			, templateUrl		: 'relationInputTemplate.html'
 		};
 
@@ -27,7 +30,6 @@
 
 		var self		= this
 			, element
-			, modelCtrl
 			, open		= false;
 
 		// Namespace for clickhandlers (outside of input to inactivate it); needed to remove them after
@@ -54,7 +56,6 @@
 		$scope.isInteractive		= $attrs.relationInteractive === 'true' ? true : false;
 
 
-
 		// Check if all fields are provided
 		var requiredFields = [ 'entityUrl', 'searchResultTemplate', 'searchField' ];
 		requiredFields.forEach( function( requiredField ) {
@@ -64,29 +65,9 @@
 		} );
 
 
+
 		// Make URLs public for «edit» and «new» buttons
 		$scope.newEntityUrl		= self.entityUrl;
-
-
-
-		// Make ngModel available to templates
-		// -> one way binding
-		$scope.entities		= undefined;
-
-		// We can't use $render instead of $scope.$watch
-		// as it does not support deep watching and the
-		// model is usually an object.
-		$scope.$watch( function() {
-			return modelCtrl.$modelValue;
-		}, function( newValue ) {
-			if( !angular.isArray( newValue ) ) {
-				newValue = [ newValue ];
-			}
-			console.log( 'RelationInput: caught modelCtrl modelValue change; is now %o', newValue );
-			$scope.entities			= newValue;
-		} );
-
-
 
 
 
@@ -95,13 +76,11 @@
 		// Init
 		//
 
-		self.init = function( el, model ) {
+		self.init = function( el ) {
 			element		= el;
-			modelCtrl	= model;
 			self.setupEventListeners();
-			console.log( 'RelationInput: model is %o on init', model );
+			console.log( 'RelationInput: init' );
 		};
-
 
 
 
@@ -117,8 +96,6 @@
 		// Make modelValue available to UI so that 
 		// selected-entities can display the selected entities
 		// But keep in self so that child directives may access it
-		//self.entities = $scope.entities = [];
-
 
 		self.addRelation = function( entity ) {
 
@@ -128,13 +105,12 @@
 			// Update model
 			if( !self.isMultiSelect ) {
 				console.log( 'RelationInputController: Set model to %o', [ entity ] );
-				modelCtrl.$setViewValue( [ entity ] );
+				self.entities = [ entity ];
 			}
 			else {
-				var currentData = ( modelCtrl.$modelValue && angular.isArray( modelCtrl.$modelValue ) ) ? modelCtrl.$modelValue.slice() : [];
-				currentData.push( entity );
-				console.log( 'RelationInputController: Set model to %o', currentData );
-				modelCtrl.$setViewValue( currentData );
+				// Make sure entities is an array. If not, init it as [].
+				self.entites = angular.isArray( self.entities ) ? self.entities : [];
+				self.entities.push( entity );
 			}
 
 			$scope.$broadcast( 'entitiesUpdated', $scope.entities );
@@ -147,12 +123,12 @@
 			console.log( 'RelationInputController: Remove relation %o', entity );
 
 			if( self.isMultiSelect ) {
-				var originalData = modelCtrl.$modelValue;
+				var originalData = $scope.entities;
 				originalData.splice( originalData.indexOf( entity ), 1 );
-				modelCtrl.$setViewValue( originalData );
+				self.entities = originalData;
 			}
 			else {
-				modelCtrl.$setViewValue( [] );
+				self.entities = [];
 			}
 
 			$scope.$broadcast( 'entitiesUpdated', $scope.entities );
@@ -185,6 +161,7 @@
 			if( isOpen ) {
 				focusInput.hide();
 				setupDocumentClickHandler();
+				setupInputBlurHandler();
 			}
 			else {
 				focusInput.show();
@@ -215,7 +192,7 @@
 
 		// Watch for events, called from within init
 		self.setupEventListeners = function() {
-			
+
 			// Open & close: 
 			// Watch for events here (instead of suggestion), as most events happen
 			// on this directive's element (and not the one of suggestion)
@@ -238,8 +215,6 @@
 				// Remove all listeners
 			} );
 
-			setupInputBlurHandler();
-
 		};
 
 
@@ -250,14 +225,22 @@
 		* Blur on the input: Hide after some ms (that are needed for a click handler to fire first)
 		*/
 		function setupInputBlurHandler() {
-		/*	console.error( element );
-			element.find( '.entity-suggestions input' ).blur( function( ev ) {
-				setTimeout( function() {
+
+			// As the input[type=text] is added in the current loop, it's not yet available in the dom. 
+			// Add watcher on the next loop. 
+			setTimeout( function() {
+				console.log( 'RelationInputController: Add blur watcher on %o', element.find( 'input[type=\'text\']:visible' ) );
+
+				// Watch for blur, setOpen to false
+				element.find( 'input[type=\'text\']:visible' ).blur( function( ev ) {
+
 					$scope.$apply( function() {
-						open = false;
+						self.setOpen( false );
 					} );
-				}, 100 );
-			} );*/
+
+				} );
+			} );
+
 		}
 
 
@@ -302,7 +285,7 @@
 				'<div data-relation-input-selected-entities></div>' +
 				'<div data-relation-input-suggestions></div>' +
 				'<div clearfix data-ng-if=\'isInteractive\'>' +
-					'<a data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
+					'<a tabindex=\'-1\' data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
 				'</div>' +
 			'</div>'
 		);
@@ -478,6 +461,7 @@
 		//
 
 		self.setupEventListeners = function() {
+
 
 			// If we use keyup, enter will only fire once (wtf?)
 			element.find( 'input' ).keydown( function( ev ) {
@@ -731,6 +715,8 @@
 
 			// See renderTemplate in relationInputSuggestionsController
 			var resultTpl = relationInputController.searchResultTemplate;
+
+			// replace [[ name ]] with {{ result.name }}
 			resultTpl = resultTpl.replace( /\[\[(\s*)(((?!\]\]).)*)\]\]/gi, function( res, space, name ) {
 				return '{{ result.' + name + ' }}';
 			} );
@@ -833,7 +819,7 @@
 				'<input type=\'text\' />' + // catch [tab]
 				'<ul>' +
 					// use result for the loop as in the suggestion directive so that we may use the same template
-					'<li data-ng-repeat=\'result in entities\' data-ng-class=\'{empty: !result.name}\'>' +
+					'<li data-ng-repeat=\'result in relationInput.entities\' data-ng-class=\'{empty: !result.name}\'>' +
 					'<span><!-- see renderTemplate() --></span>' +
 					'<button data-ng-if=\'isInteractive\' data-ng-click=\'visitEntity($event, result)\'><span class=\'fa fa-pencil\'></span></button>' +
 					'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
