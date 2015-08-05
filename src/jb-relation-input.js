@@ -229,16 +229,24 @@
 			// As the input[type=text] is added in the current loop, it's not yet available in the dom. 
 			// Add watcher on the next loop. 
 			setTimeout( function() {
+			
 				console.log( 'RelationInputController: Add blur watcher on %o', element.find( 'input[type=\'text\']:visible' ) );
 
 				// Watch for blur, setOpen to false
 				element.find( 'input[type=\'text\']:visible' ).blur( function( ev ) {
 
-					$scope.$apply( function() {
-						self.setOpen( false );
-					} );
+
+					// If user clicks an entry of the suggestionList, a blur is fired. If we remove the 
+					// suggestionList on blur, the click does not happen any more, because the suggestionList
+					// is not there any more -> Delay the removal of the suggestionList by 100ms.
+					setTimeout( function() {
+						$scope.$apply( function() {
+							self.setOpen( false );
+						} );
+					}, 100 );
 
 				} );
+
 			} );
 
 		}
@@ -352,6 +360,8 @@
 		//
 
 		$scope.selectResult = function( result ) {
+
+			console.log( 'RelationInputSuggestionsController: Clicked %o', result );
 
 			// Propagate to relationInputController that updates the model
 			relationInputController.addRelation( result );
