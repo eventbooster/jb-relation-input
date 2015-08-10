@@ -113,7 +113,7 @@
 				self.entities.push( entity );
 			}
 
-			$scope.$broadcast( 'entitiesUpdated', $scope.entities );
+			$scope.$broadcast( 'entitiesUpdated', self.entities );
 
 		};
 
@@ -123,7 +123,7 @@
 			console.log( 'RelationInputController: Remove relation %o', entity );
 
 			if( self.isMultiSelect ) {
-				var originalData = $scope.entities;
+				var originalData = self.entities;
 				originalData.splice( originalData.indexOf( entity ), 1 );
 				self.entities = originalData;
 			}
@@ -131,7 +131,7 @@
 				self.entities = [];
 			}
 
-			$scope.$broadcast( 'entitiesUpdated', $scope.entities );
+			$scope.$broadcast( 'entitiesUpdated', self.entities );
 
 		};
 
