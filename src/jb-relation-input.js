@@ -109,7 +109,7 @@
 			}
 			else {
 				// Make sure entities is an array. If not, init it as [].
-				self.entites = angular.isArray( self.entities ) ? self.entities : [];
+				self.entities = angular.isArray( self.entities ) ? self.entities : [];
 				self.entities.push( entity );
 			}
 
@@ -384,7 +384,7 @@
 		// Model changed
 		//
 
-		// Entites updated (propagated from relationInput)
+		// Entities updated (propagated from relationInput)
 		// Update results displayed (remove added result from suggestions)
 		$scope.$on( 'entitiesUpdated', function() {
 			self.filterResults();
