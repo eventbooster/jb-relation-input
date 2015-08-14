@@ -78,12 +78,16 @@
 
 		self.init = function( el ) {
 			element		= el;
-			self.setupEventListeners();
-			console.log( 'RelationInput: init' );
+			self.setupEventListeners();			
 		};
 
 
-
+		// Broadcast entitiesUpdated when entities change (added/removed/initialized)
+		$scope.$watch( function() {
+			return self.entities;
+		}, function() {
+			$scope.$broadcast( 'entitiesUpdated', self.entities );
+		}, true );
 
 
 
@@ -113,7 +117,7 @@
 				self.entities.push( entity );
 			}
 
-			$scope.$broadcast( 'entitiesUpdated', self.entities );
+			//$scope.$broadcast( 'entitiesUpdated', self.entities );
 
 		};
 
@@ -131,7 +135,7 @@
 				self.entities = [];
 			}
 
-			$scope.$broadcast( 'entitiesUpdated', self.entities );
+			//$scope.$broadcast( 'entitiesUpdated', self.entities );
 
 		};
 
@@ -356,7 +360,7 @@
 
 
 		//
-		// Click on result or enter
+		// Click on result OR enter
 		//
 
 		$scope.selectResult = function( result ) {
@@ -366,8 +370,19 @@
 			// Propagate to relationInputController that updates the model
 			relationInputController.addRelation( result );
 
-			// Default results: self.emptyQueryResults
-			$scope.results			= $scope.emptyQueryResults ? $scope.emptyQueryResults.slice( 0 ) : [];
+			// Display default results (i.e. results for empty search string)
+			// If emptyQueryResults is not set, there are no default results.
+			if( !$scope.emptyQueryResults ) {
+				$scope.results = [];
+			}
+
+			// Display all emptyQueryResults, then filter them.
+			else {
+				$scope.results = $scope.emptyQueryResults.slice( 0 );
+				// Make sure there are no duplicates.
+				self.filterResults();
+			}
+
 
 			// Reset value of input and searchQuery
 			$scope.searchQuery		= '';
@@ -442,6 +457,9 @@
 			}
 
 		} );
+
+
+
 
 
 
@@ -571,7 +589,7 @@
 			if( !query && $scope.emptyQueryResults ) {
 
 				// Clone data (we don't want emptyQueryResults to be changed whenever data changes)
-				$scope.results = $scope.emptyQueryResults; //.slice( 0 );
+				$scope.results = $scope.emptyQueryResults.slice( 0 );
 				self.filterResults();
 
 				return;
@@ -669,7 +687,10 @@
 
 			var selected = relationInputController.entities;
 
-			if( relationInputController.isMultiRelation ) {
+			var removedCount = 0;
+
+			if( relationInputController.isMultiSelect && angular.isArray( selected ) && angular.isArray( $scope.results ) ) {
+
 				for( var i = 0; i < selected.length; i++ ) {
 					for( var j = $scope.results.length - 1; j >= 0; j-- ) {
 
@@ -680,6 +701,7 @@
 
 						if( $scope.results[ j ].id === selected[ i ].id ) {
 							$scope.results.splice( j, 1 );
+							removedCount++;
 						}
 					}
 				}
@@ -692,7 +714,7 @@
 				$scope.selected = $scope.results[ 0 ];
 			}
 
-			console.log( 'RelationInput: filterResults; results is %o, selected %o', $scope.results, $scope.selected );
+			console.log( 'RelationInput: filterResults; results is %o, selected %o. Removed %o elements from $scope.results (%o entities selected)', $scope.results, $scope.selected, removedCount, ( relationInputController.entities ? relationInputController.entities.length : 'none' ) );
 
 		};
 
@@ -839,8 +861,6 @@
 			*/
 			extractSelectFields: function( template ) {
 			
-				console.log( 'RelationInputService: Get fields from %o', template );
-
 				// Split at [ 
 				var tplSplit		= template.split( '[[' ).slice( 1 )
 				// Fields to select (e.g. 'eventData.name')
@@ -865,6 +885,8 @@
 					selectFields.push( field );
 
 				} );
+
+				console.log( 'RelationInputService: Get fields from %o, return %o', template, selectFields );
 
 				return selectFields;
 
