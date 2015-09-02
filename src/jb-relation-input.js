@@ -168,6 +168,7 @@
 				setupInputBlurHandler();
 			}
 			else {
+				removeInputBlurHandler();
 				focusInput.show();
 				removeDocumentClickHandler();
 			}
@@ -225,6 +226,7 @@
 
 
 
+
 		/**
 		* Blur on the input: Hide after some ms (that are needed for a click handler to fire first)
 		*/
@@ -234,25 +236,47 @@
 			// Add watcher on the next loop. 
 			setTimeout( function() {
 			
-				console.log( 'RelationInputController: Add blur watcher on %o', element.find( 'input[type=\'text\']:visible' ) );
+				// See if tab was pressed. Don't fire on blur, as blur usually (but not always!) fires before the click on a
+				// suggestion and adding suggestion by the mouse will therefore not work (the suggestion list is being hidden
+				// before it can be clicked)
+				element.find( 'input[type=\'text\']:visible' ).on( 'keydown.relationInputBlurWatcher', function( ev ) {
 
-				// Watch for blur, setOpen to false
-				element.find( 'input[type=\'text\']:visible' ).blur( function( ev ) {
+					console.error( ev );
 
+					if( ev.which !== 9 ) {
+						return true;
+					}
 
-					// If user clicks an entry of the suggestionList, a blur is fired. If we remove the 
-					// suggestionList on blur, the click does not happen any more, because the suggestionList
-					// is not there any more -> Delay the removal of the suggestionList by 100ms.
-					setTimeout( function() {
+					// Now, that's complicated and dirty: 
+					// - If shiftKey was pressed (focus previous element): Previous input will be the tab-catcher, the 
+					//   suggestion list will therefore be displayed again. Use a timeout. 
+					// - If shiftKey was _not_ pressed, straightly go to the next element. Using a timeout here messes things
+					//   up, focus gets lost. 
+					if( ev.shiftKey ) {
+						setTimeout( function() {
+							$scope.$apply( function() {
+								self.setOpen( false );
+							} );
+						}, 10);
+					}
+					else {
 						$scope.$apply( function() {
 							self.setOpen( false );
 						} );
-					}, 100 );
+					}
 
 				} );
 
 			} );
 
+		}
+
+
+		/**
+		* Remove blur handler
+		*/
+		function removeInputBlurHandler() {
+			element.find( 'input[type=\'text\']' ).off( 'keydown.relationInputBlurWatcher' );
 		}
 
 
@@ -285,22 +309,6 @@
 			$( document ).off( 'click.' + eventNamespace );
 		}
 
-
-	} ] )
-
-
-
-	.run( ['$templateCache', function( $templateCache ) {
-
-		$templateCache.put( 'relationInputTemplate.html',
-			'<div>' +
-				'<div data-relation-input-selected-entities></div>' +
-				'<div data-relation-input-suggestions></div>' +
-				'<div clearfix data-ng-if=\'isInteractive\'>' +
-					'<a tabindex=\'-1\' data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
-				'</div>' +
-			'</div>'
-		);
 
 	} ] )
 
@@ -363,7 +371,12 @@
 		// Click on result OR enter
 		//
 
-		$scope.selectResult = function( result ) {
+		$scope.selectResult = function( result, ev ) {
+
+			// event is passed if user clicks (see data-ng-click)
+			if( ev ) {
+				ev.preventDefault();
+			}
 
 			console.log( 'RelationInputSuggestionsController: Clicked %o', result );
 
@@ -387,6 +400,11 @@
 			// Reset value of input and searchQuery
 			$scope.searchQuery		= '';
 			element.find( 'input' ).val( '' );
+
+			// If it's a single input, go to the next field. 
+			if( !relationInputController.isMultiSelect ) {
+				relationInputController.setOpen( false );
+			}
 
 		};
 
@@ -485,7 +503,7 @@
 			console.log( 'RelationInputController: Render template %o', resultTpl );
 
 			var tpl = $( $templateCache.get( 'relationInputSuggestionsTemplate.html' ) );
-			tpl.find( 'li' ).append( resultTpl );
+			tpl.find( 'a' ).append( resultTpl );
 			element.replaceWith( tpl );
 			$compile( tpl )( $scope );
 			element = tpl;
@@ -727,25 +745,6 @@
 
 
 
-	.run( [ '$templateCache', function( $templateCache ) {
-
-		$templateCache.put( 'relationInputSuggestionsTemplate.html',
-			'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' + 
-				'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
-				'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
-					'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
-				'</div>' +
-				'<div class=\'results-list\'>' +
-					'<ul data-ng-if=\'results.length > 0\'>' +
-						'<li data-ng-repeat=\'result in results\' data-ng-class=\'{selected:selected===result}\' data-ng-click=\'selectResult(result)\'><!-- see renderTemplate --></li>' +
-					'</ul>' +
-				'</div>' +
-			'</div>'
-		);
-
-	} ] )
-
-
 
 
 
@@ -901,19 +900,53 @@
 
 	.run( [ '$templateCache', function( $templateCache ) {
 
+
+		$templateCache.put( 'relationInputTemplate.html',
+			'<div>' + // Only content is taken. Do not add any classes or something to this div.
+				'<div class=\'dropdown\'>' +
+					'<div data-relation-input-selected-entities></div>' +
+					'<div data-relation-input-suggestions></div>' +
+					'<div clearfix data-ng-if=\'isInteractive\'>' +
+						'<a tabindex=\'-1\' class=\'add-entity\' data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
+					'</div>' +
+				'</div>' +
+			'</div>'
+		);
+
+
+
 		$templateCache.put( 'relationInputSelectedEntitiesTemplate.html',
 			'<div class=\'selected-entities\' data-ng-class=\'{ "single-select": !isMultiSelect }\'>' +
 				'<input type=\'text\' />' + // catch [tab]
 				'<ul>' +
 					// use result for the loop as in the suggestion directive so that we may use the same template
-					'<li data-ng-repeat=\'result in relationInput.entities\' data-ng-class=\'{empty: !result.name}\'>' +
-					'<span><!-- see renderTemplate() --></span>' +
-					'<button data-ng-if=\'isInteractive\' data-ng-click=\'visitEntity($event, result)\'><span class=\'fa fa-pencil\'></span></button>' +
-					'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
+					'<li data-ng-repeat=\'result in relationInput.entities\'>' +
+						'<span><!-- see renderTemplate() --></span>' +
+						'<button data-ng-if=\'isInteractive\' data-ng-click=\'visitEntity($event, result)\' class=\'badge\'><span class=\'fa fa-pencil\'></span></button>' +
+						'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
 					'</li>' +
 				'</ul>' +
+				'<span class=\'caret\'></span>' +
 			'</div>'
 		);
+
+
+
+		$templateCache.put( 'relationInputSuggestionsTemplate.html',
+			'<div class=\'entity-suggestions dropdown-menu\' style=\'display:inherit;\' data-ng-show=\'isOpen()\'>' +  // display:inherit: overwrite bootstrap's .dropdown-menu
+				'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
+				'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
+					'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
+				'</div>' +
+				'<div class=\'results-list\'>' +
+					'<ul data-ng-if=\'results.length > 0\'>' +
+						'<li data-ng-repeat=\'result in results\'><a href=\'#\' data-ng-class=\'{selected:selected===result}\' data-ng-click=\'selectResult(result, $event)\'><!-- see renderTemplate --></a></li>' +
+					'</ul>' +
+				'</div>' +
+			'</div>'
+		);
+
+
 
 	} ] );
 
