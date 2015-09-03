@@ -52,8 +52,12 @@
 
 
 		// May the relations be deleted?
-		$scope.deletable			= $scope.$parent.$eval( $attrs.deletable );
-		$scope.isInteractive		= $attrs.relationInteractive === 'true' ? true : false;
+		$scope.deletable					= $scope.$parent.$eval( $attrs.deletable );
+		// Set isInteractive to false, update when permissions were gotten from server
+		$scope.relatedEntityCanBeCreated	= false; //$attrs.relationInteractive === 'true' ? true : false;
+		$scope.relatedEntityCanBeEdited		= false;
+
+
 
 
 		// Check if all fields are provided
@@ -78,7 +82,8 @@
 
 		self.init = function( el ) {
 			element		= el;
-			self.setupEventListeners();			
+			self.setupEventListeners();
+			self.setRelatedEntityPermissions();
 		};
 
 
@@ -88,6 +93,67 @@
 		}, function() {
 			$scope.$broadcast( 'entitiesUpdated', self.entities );
 		}, true );
+
+
+
+
+		/**
+		* Sets $scope.relatedEntityCanBeCreated and $scoperelatedEntityCanBeEdited
+		* by using the permissions (OPTIONS call) and the passed relationInteractive 
+		* attribute
+		*/
+		self.setRelatedEntityPermissions = function() {
+
+			return self.getOptions()
+				.then( function( data ) {
+
+					if( !data.permissions ) {
+						console.warn( 'RelationInputController: permissions property missing in OPTIONS call response', JSON.stringify( permissions ) );
+						return;
+					}
+
+					console.error( data.permissions );
+					console.error( $attrs.relationInteractive );
+
+					if( data.permissions.create && data.permissions.create.allowed && $attrs.relationInteractive ) {
+						console.error( 'create ' + self.entityUrl );
+						$scope.relatedEntityCanBeCreated = true;
+					}
+
+					if( data.permissions.update && data.permissions.update.allowed && $attrs.relationInteractive ) {
+						console.error( 'edit ' + self.entityUrl );
+						$scope.relatedEntityCanBeEdited = true;
+					}
+
+				}, function( err ) {
+					// Nothing to do
+				} );
+
+		};
+
+
+		/**
+		* Get OPTIONS for self.entityUrl. Needed to read the write/edit permissions (and to check if 
+		* edit/create symbols should be displayed).
+		*/
+		self.getOptions = function() {
+
+			return APIWrapperService.request( {
+				method			: 'OPTIONS'
+				, url			: self.entityUrl
+			} )
+			.then( function( data ) {
+				return data;
+			}, function( err ) {
+				// Error does not really matter – we just won't display the create/edit tags
+				console.error( 'RelationInputController: Could not get permission data: ' + JSON.stringify( err ) );
+				return $q.reject( err );
+			} );
+
+		};
+
+
+
 
 
 
@@ -362,7 +428,19 @@
 
 		$scope.$watch( 'searchQuery', function( newValue ) {
 			console.log( 'RelationInputSuggestionsController: searchQuery changed to %o', $scope.searchQuery );
-			self.getData( newValue );
+
+			// Init: Don't get data instantly as it will slow down the UI; wait for 1–2 secs. 
+			if( !newValue ) {
+				setTimeout( function() {
+					self.getData( newValue );
+				}, 1000 + Math.round( Math.random() * 2000 ) );
+			}
+
+			// Not init: Search instantly.
+			else {
+				self.getData( newValue );
+			}
+
 		} );
 
 
@@ -906,7 +984,8 @@
 				'<div class=\'dropdown\'>' +
 					'<div data-relation-input-selected-entities></div>' +
 					'<div data-relation-input-suggestions></div>' +
-					'<div clearfix data-ng-if=\'isInteractive\'>' +
+					// Add new entity
+					'<div clearfix data-ng-if=\'relatedEntityCanBeCreated\'>' +
 						'<a tabindex=\'-1\' class=\'add-entity\' data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
 					'</div>' +
 				'</div>' +
@@ -922,7 +1001,9 @@
 					// use result for the loop as in the suggestion directive so that we may use the same template
 					'<li data-ng-repeat=\'result in relationInput.entities\'>' +
 						'<span><!-- see renderTemplate() --></span>' +
-						'<button data-ng-if=\'isInteractive\' data-ng-click=\'visitEntity($event, result)\' class=\'badge\'><span class=\'fa fa-pencil\'></span></button>' +
+						// Edit
+						'<button data-ng-if=\'relatedEntityCanBeEdited\' data-ng-click=\'visitEntity($event, result)\' class=\'badge\'><span class=\'fa fa-pencil\'></span></button>' +
+						// Delete
 						'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
 					'</li>' +
 				'</ul>' +
