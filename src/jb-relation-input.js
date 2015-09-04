@@ -112,18 +112,15 @@
 						return;
 					}
 
-					console.error( data.permissions );
-					console.error( $attrs.relationInteractive );
-
 					if( data.permissions.create && data.permissions.create.allowed && $attrs.relationInteractive ) {
-						console.error( 'create ' + self.entityUrl );
 						$scope.relatedEntityCanBeCreated = true;
 					}
 
 					if( data.permissions.update && data.permissions.update.allowed && $attrs.relationInteractive ) {
-						console.error( 'edit ' + self.entityUrl );
 						$scope.relatedEntityCanBeEdited = true;
 					}
+
+					console.log( 'RelationInputController: Rights for ' + self.entityUrl + ': Create ' + $scope.relatedEntityCanBeCreated + ', edit: ' + $scope.relatedEntityCanBeCreated );
 
 				}, function( err ) {
 					// Nothing to do
@@ -306,8 +303,6 @@
 				// suggestion and adding suggestion by the mouse will therefore not work (the suggestion list is being hidden
 				// before it can be clicked)
 				element.find( 'input[type=\'text\']:visible' ).on( 'keydown.relationInputBlurWatcher', function( ev ) {
-
-					console.error( ev );
 
 					if( ev.which !== 9 ) {
 						return true;
