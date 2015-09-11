@@ -137,7 +137,7 @@
 
 			return APIWrapperService.request( {
 				method			: 'OPTIONS'
-				, url			: self.entityUrl
+				, url			: '/' + self.entityUrl
 			} )
 			.then( function( data ) {
 				return data;
@@ -719,7 +719,7 @@
 
 			// MAKE REQUEST
 			APIWrapperService.request( {
-				url				: relationInputController.entityUrl
+				url				: '/' + relationInputController.entityUrl
 				, method		: 'GET'
 				, headers		: headers
 			} )
