@@ -6,7 +6,7 @@
 	'use strict';
 
 	angular
-	.module( 'jb.relationInput', [ 'eb.apiWrapper' ] )
+	.module( 'jb.relationInput', [ 'jb.apiWrapper' ] )
 	.directive( 'relationInput', [ function() {
 
 		return {
