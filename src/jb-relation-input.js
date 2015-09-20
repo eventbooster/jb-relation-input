@@ -20,6 +20,7 @@
 			}
 			, scope				: {
 				entities		: '=ngModel'
+				, entityUrl		: '@relationEntityEndpoint'
 			}
 			, templateUrl		: 'relationInputTemplate.html'
 		};
@@ -37,7 +38,7 @@
 		var eventNamespace = ( Math.random() + '' ).replace( '.', '' ).substring( 1, 15 );
 
 		// URL to get suggestions from
-		self.entityUrl				= $attrs.relationEntityEndpoint;
+		//self.entityUrl				= $attrs.relationEntityEndpoint;
 
 		// Variables for suggestion: 
 		// - what fields do we search?
