@@ -1,6 +1,6 @@
 {
 	"name"			: "jb-relation-input"
-	, "version"		: "0.1.1"
+	, "version"		: "0.1.3"
 	, "main"		: "src/jb-relation-input.js"
 	, "dependencies": {
 		"angular"	: ">=1.3.0"

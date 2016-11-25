@@ -19,8 +19,9 @@
 				ctrl[ 0 ].init( element );
 			}
 			, scope				: {
-				entities		: '=ngModel'
+				  entities		: '=ngModel'
 				, entityUrl		: '@relationEntityEndpoint'
+				, filters 		: '<'
 			}
 			, templateUrl		: 'relationInputTemplate.html'
 		};
@@ -113,11 +114,11 @@
 						return;
 					}
 
-					if( data.permissions.create && data.permissions.create.allowed && $attrs.relationInteractive ) {
+					if( data.permissions.createOrUpdate === true && $attrs.relationInteractive ) {
 						$scope.relatedEntityCanBeCreated = true;
 					}
 
-					if( data.permissions.update && data.permissions.update.allowed && $attrs.relationInteractive ) {
+					if( data.permissions.update === true &&  $attrs.relationInteractive ) {
 						$scope.relatedEntityCanBeEdited = true;
 					}
 
@@ -136,10 +137,7 @@
 		*/
 		self.getOptions = function() {
 
-			return APIWrapperService.request( {
-				method			: 'OPTIONS'
-				, url			: '/' + self.entityUrl
-			} )
+			return APIWrapperService.getOptions('/' + self.entityUrl)
 			.then( function( data ) {
 				return data;
 			}, function( err ) {
@@ -696,18 +694,21 @@
 			// COMPOSE HEADER FIELDS
 			var headers		= {
 				range		: '0-' + relationInputController.resultCount
-			};
+                }
+                , filters = relationInputController.filters ? relationInputController.filters.slice(0) : [];
 
 			// Filter header
 			if( query ) {
-	
-				var filterField			= relationInputController.searchField
-					, filter			= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')'; // ;;: Unicode hack
 
-				headers.filter			= filter;
+				var   filterField		= relationInputController.searchField
+                      // The ';;' prefix is an unicode hack to prevent the server from stripping stuff
+					, baseFilter		= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')';
 
+				filters.unshift(baseFilter);
 			}
-			
+
+            if(filters.length) headers.filter = filters.join(', ');
+
 			// Select header
 			var selectFields			= self.getSelectFields();
 			if( selectFields && selectFields.length ) {
