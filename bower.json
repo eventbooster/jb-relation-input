@@ -3,7 +3,8 @@
 	, "version"		: "0.1.3"
 	, "main"		: "src/jb-relation-input.js"
 	, "dependencies": {
-		"angular"	: ">=1.3.0"
+		  "angular"		   : ">=1.3.0"
+		, "jb-api-wrapper" : "0.5.*"
 	}
 	, "devDependencies": {
 		"bootstrap"	: ">=3.0.0"
