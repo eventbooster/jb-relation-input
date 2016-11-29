@@ -6,7 +6,7 @@
 	'use strict';
 
 	angular
-	.module( 'jb.relationInput', [ 'jb.apiWrapper' ] )
+	.module( 'jb.relationInput', [ 'jb.apiWrapper', 'ui.router' ] )
 	.directive( 'relationInput', [ function() {
 
 		return {
@@ -28,9 +28,9 @@
 
 	} ] )
 
-	.controller( 'RelationInputController', [ '$scope', '$attrs', '$q', '$rootScope', 'APIWrapperService', function( $scope, $attrs, $q, $rootScope, APIWrapperService ) {
+	.controller( 'RelationInputController', [ '$scope', '$attrs', '$q', '$rootScope', 'APIWrapperService', '$state', function( $scope, $attrs, $q, $rootScope, APIWrapperService, $state ) {
 
-		var self		= this
+		var   self		= this
 			, element
 			, open		= false;
 
@@ -52,6 +52,8 @@
 
 		self.resultCount			= $attrs.resultCount || 10;
 
+        self.optionsData            = null;
+
 
 		// May the relations be deleted?
 		$scope.deletable					= $scope.$parent.$eval( $attrs.deletable );
@@ -59,7 +61,28 @@
 		$scope.relatedEntityCanBeCreated	= false; //$attrs.relationInteractive === 'true' ? true : false;
 		$scope.relatedEntityCanBeEdited		= false;
 
+        /**
+         * @param ev
+         * @param entity
+         */
+        $scope.visitEntity = function( ev, entity ) {
 
+            var   idKey = self.getIdField()
+                , id    = (entity && entity[idKey]) ? entity[idKey] : 'new';
+
+            ev.preventDefault();
+
+            $state.go('app.detail', {
+                  entityName    : $scope.newEntityUrl
+                , entityId      : id
+            });
+        };
+
+        self.getIdField = function(){
+            // a wild guess
+            if(!self.optionsData) return 'id';
+            return self.optionsData.primaryKeys[0];
+        };
 
 
 		// Check if all fields are provided
@@ -100,10 +123,12 @@
 
 
 		/**
-		* Sets $scope.relatedEntityCanBeCreated and $scoperelatedEntityCanBeEdited
-		* by using the permissions (OPTIONS call) and the passed relationInteractive 
-		* attribute
-		*/
+		 * Sets $scope.relatedEntityCanBeCreated and $scoperelatedEntityCanBeEdited
+		 * by using the permissions (OPTIONS call) and the passed relationInteractive
+         * attribute
+         *
+         * @todo: This is not fully correct, since the relation needs to to be checked with regard to the parent entity
+		 */
 		self.setRelatedEntityPermissions = function() {
 
 			return self.getOptions()
@@ -123,6 +148,7 @@
 					}
 
 					console.log( 'RelationInputController: Rights for ' + self.entityUrl + ': Create ' + $scope.relatedEntityCanBeCreated + ', edit: ' + $scope.relatedEntityCanBeCreated );
+                    self.optionsData = data;
 
 				}, function( err ) {
 					// Nothing to do
@@ -136,7 +162,7 @@
 		* edit/create symbols should be displayed).
 		*/
 		self.getOptions = function() {
-
+            if(self.optionsData) return $q.when(self.optionsData);
 			return APIWrapperService.getOptions('/' + self.entityUrl)
 			.then( function( data ) {
 				return data;
@@ -838,17 +864,11 @@
 	} ] )
 
 
-	.controller( 'RelationInputSelectedEntitiesController', [ '$scope', '$location', '$templateCache', '$compile', function( $scope, $location, $templateCache, $compile ) {
+	.controller( 'RelationInputSelectedEntitiesController', [ '$scope', '$state', '$templateCache', '$compile', function( $scope, $state, $templateCache, $compile ) {
 
 		var self = this
 			, element
 			, relationInputController;
-
-
-		$scope.visitEntity = function( ev, entity ) {
-			ev.preventDefault();
-			$location.path( $scope.newEntityUrl + '/' + entity.id );
-		};
 
 
 		$scope.removeEntity = function( ev, entity ) {
@@ -983,7 +1003,7 @@
 					'<div data-relation-input-suggestions></div>' +
 					// Add new entity
 					'<div clearfix data-ng-if=\'relatedEntityCanBeCreated\'>' +
-						'<a tabindex=\'-1\' class=\'add-entity\' data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
+						'<a tabindex=\'-1\' class=\'add-entity\' ng-href="#" ng-click="visitEntity($event)"><span class=\'fa fa-plus\'></span> New</a>' +
 					'</div>' +
 				'</div>' +
 			'</div>'
