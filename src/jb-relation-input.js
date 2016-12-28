@@ -178,13 +178,13 @@
         };
 
         self.relatedEntityCanBeCreated = function(){
-            return self.isInteractive !== false
+            return self.isInteractive === true
                     && self.disableNew !== true
                     && self.canCreateRelatedEntity === true;
         };
 
         self.relatedEntityCanBeEdited = function(){
-            return self.isInteractive !== false
+            return self.isInteractive === true
                     && self.disableEdit !== true
                     && self.canEditRelatedEntity === true;
         };
