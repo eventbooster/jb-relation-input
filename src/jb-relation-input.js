@@ -72,16 +72,6 @@
         // input is not active any more.
         var eventNamespace = ( Math.random() + '' ).replace( '.', '' ).substring( 1, 15 );
 
-        // URL to get suggestions from
-        //self.entityUrl				= $attrs.relationEntityEndpoint;
-
-        // Variables for suggestion:
-        // - what fields do we search?
-        //self.searchField			= $attrs.relationEntitySearchField;
-
-        // Template for search results
-        //self.searchResultTemplate	= $attrs.relationSuggestionTemplate;
-
         self.optionsData            = null;
 
         $scope.relatedEntityCanBeCreated	= false;
@@ -93,13 +83,12 @@
          */
         $scope.visitEntity = function( ev, entity ) {
 
-            var   idKey = self.getIdField()
-                , id    = (entity && entity[idKey]) ? entity[idKey] : 'new';
+            var id    = self.getId(entity);
 
             ev.preventDefault();
 
             $state.go('app.detail', {
-                  entityName    : $scope.newEntityUrl
+                  entityName    : self.entityName
                 , entityId      : id
             });
         };
@@ -110,12 +99,28 @@
             return self.optionsData.primaryKeys[0];
         };
 
+        self.getId = function(entity){
+            var   idKey = self.getIdField()
+            return (entity && entity[idKey]) ? entity[idKey] : 'new';
+        };
+
         // Make URLs public for «edit» and «new» buttons
         $scope.newEntityUrl		= self.entityUrl;
 
 
 
-
+        $scope.$watch(function(){
+            return self.entityUrl
+        }, function(newValue){
+            if(newValue){
+                var   separator = '/'
+                    , sanitized = newValue;
+                if(newValue[newValue.length - 1] === separator){
+                    sanitized = newValue.slice(0, newValue.length - 2);
+                }
+                self.entityName = sanitized.split(separator).pop();
+            }
+        });
         //
         // Init
         //
@@ -1024,7 +1029,8 @@
                     '<div data-relation-input-suggestions></div>' +
                     // Add new entity
                     '<div clearfix data-ng-if="relationInput.relatedEntityCanBeCreated()">' +
-                        '<a tabindex=\'-1\' class=\'add-entity\' ng-href="#" ng-click="visitEntity($event)"><span class=\'fa fa-plus\'></span> New</a>' +
+                        //'<a tabindex=\'-1\' class="add-entity" ng-href="#" ng-click="visitEntity($event)"><span class=\'fa fa-plus\'></span> New</a>' +
+                        '<a tabindex=\'-1\' class="add-entity" data-ui-sref="app.detail({ entityName : relationInput.entityName , entityId : relationInput.getId() })"><span class="fa fa-plus"></span> New</a>' +
                     '</div>' +
                 '</div>' +
             '</div>'
