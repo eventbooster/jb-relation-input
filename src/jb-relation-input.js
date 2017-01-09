@@ -86,7 +86,6 @@
             var id    = self.getId(entity);
 
             ev.preventDefault();
-
             $state.go('app.detail', {
                   entityName    : self.entityName
                 , entityId      : id
