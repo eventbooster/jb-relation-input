@@ -33,6 +33,10 @@
 .relation-select .selected-entities.single-select ul li {
   background-color: transparent;
 }
+.relation-select .selected-entities.disabled {
+  background-color: #eee;
+  opacity: 1;
+}
 .relation-select .selected-entities .caret {
   position: absolute;
   right: 25px;

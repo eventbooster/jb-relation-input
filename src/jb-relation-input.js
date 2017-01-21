@@ -1,35 +1,70 @@
 /**
 * Input (typeahead) for getting entities from the server. Made for the Distributed framework.
 * ATTENTION: bindToController newly introduced, might cause problems. Needs testing.
+ *
 */
 ( function() {
 	'use strict';
 
 	angular
-	.module( 'jb.relationInput', [ 'jb.apiWrapper' ] )
+	.module( 'jb.relationInput', [ 'jb.apiWrapper', 'ui.router' ] )
 	.directive( 'relationInput', [ function() {
 
 		return {
-			require				: [ 'relationInput' ]
-			, replace			: true
-			, controller		: 'RelationInputController'
+			  controller		: 'RelationInputController'
 			, bindToController	: true
 			, controllerAs		: 'relationInput'
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element );
+				// Check if all fields are provided
+				var requiredFields = [ 'relationEntityEndpoint', 'relationSuggestionTemplate', 'relationSearchField' ];
+				requiredFields.forEach( function( requiredField ) {
+					if( !attrs.hasOwnProperty(requiredField) ) {
+						console.error( 'RelationInput: Missing %s, is mandatory', requiredField );
+					}
+				});
+
+				if(!attrs.hasOwnProperty('relationResultCount')){
+					ctrl.resultCount = 20;
+				}
+
+				ctrl.init( element, attrs );
 			}
 			, scope				: {
-				entities		: '=ngModel'
-				, entityUrl		: '@relationEntityEndpoint'
+				  entities		        : '=ngModel'
+				, entityUrl		        : '@relationEntityEndpoint'
+				, searchResultTemplate  : '@relationSuggestionTemplate'
+				, searchField           : '@relationSearchField'
+
+				, filters 		        : '<?relationFilter'
+				, deletable             : '<?relationIsDeletable'
+				, creatable             : '<?relationIsCreatable'
+
+				, resultCount           : '<?relationResultCount'
+
+				, isMultiSelect         : '<?relationIsMultiSelect'
+
+				, isInteractive         : '<?relationIsInteractive'
+				, disableEdit           : '<?relationDisableEditButton'
+				, disableNew            : '<?relationDisableNewButton'
+				, disableRemove         : '<?relationDisableRemoveButton'
+
+				, isReadonly            : '<?relationIsReadonly'
 			}
 			, templateUrl		: 'relationInputTemplate.html'
 		};
 
 	} ] )
 
-	.controller( 'RelationInputController', [ '$scope', '$attrs', '$q', '$rootScope', 'APIWrapperService', function( $scope, $attrs, $q, $rootScope, APIWrapperService ) {
+	.controller( 'RelationInputController', [
+		  '$scope'
+		, '$attrs'
+		, '$q'
+		, '$rootScope'
+		, 'APIWrapperService'
+		, '$state'
+		, function( $scope, $attrs, $q, $rootScope, APIWrapperService, $state ) {
 
-		var self		= this
+		var   self		= this
 			, element
 			, open		= false;
 
@@ -37,54 +72,66 @@
 		// input is not active any more.
 		var eventNamespace = ( Math.random() + '' ).replace( '.', '' ).substring( 1, 15 );
 
-		// URL to get suggestions from
-		//self.entityUrl				= $attrs.relationEntityEndpoint;
+		self.optionsData            = null;
 
-		// Variables for suggestion: 
-		// - what fields do we search?
-		self.searchField			= $attrs.relationEntitySearchField;
-
-		// Template for search results
-		self.searchResultTemplate	= $attrs.relationSuggestionTemplate;
-
-		self.isMultiSelect			= $attrs.multiSelect === 'true' ? true : false;
-
-		self.resultCount			= $attrs.resultCount || 10;
-
-
-		// May the relations be deleted?
-		$scope.deletable					= $scope.$parent.$eval( $attrs.deletable );
-		// Set isInteractive to false, update when permissions were gotten from server
-		$scope.relatedEntityCanBeCreated	= false; //$attrs.relationInteractive === 'true' ? true : false;
+		$scope.relatedEntityCanBeCreated	= false;
 		$scope.relatedEntityCanBeEdited		= false;
 
+		/**
+		 * @param ev
+		 * @param entity
+		 */
+		$scope.visitEntity = function( ev, entity ) {
 
+			var id    = self.getId(entity);
 
+			ev.preventDefault();
+			$state.go('app.detail', {
+				  entityName    : self.entityName
+				, entityId      : id
+			});
+		};
 
-		// Check if all fields are provided
-		var requiredFields = [ 'entityUrl', 'searchResultTemplate', 'searchField' ];
-		requiredFields.forEach( function( requiredField ) {
-			if( !self[ requiredField ] ) {
-				console.error( 'RelationInput: Missing %s, is mandatory', requiredField );
-			}
-		} );
+		self.getIdField = function(){
+			// a wild guess
+			if(!self.optionsData) return 'id';
+			return self.optionsData.primaryKeys[0];
+		};
 
-
+		self.getId = function(entity){
+			var   idKey = self.getIdField()
+			return (entity && entity[idKey]) ? entity[idKey] : 'new';
+		};
 
 		// Make URLs public for «edit» and «new» buttons
 		$scope.newEntityUrl		= self.entityUrl;
 
 
 
-
+		$scope.$watch(function(){
+			return self.entityUrl
+		}, function(newValue){
+			if(newValue){
+				var   separator = '/'
+					, sanitized = newValue;
+				if(newValue[newValue.length - 1] === separator){
+					sanitized = newValue.slice(0, newValue.length - 2);
+				}
+				self.entityName = sanitized.split(separator).pop();
+			}
+		});
 		//
 		// Init
 		//
 
-		self.init = function( el ) {
+		self.init = function( el, attrs ) {
 			element		= el;
+			self.setupDefaultValues();
 			self.setupEventListeners();
 			self.setRelatedEntityPermissions();
+		};
+
+		self.setupDefaultValues = function(){
 		};
 
 
@@ -99,10 +146,12 @@
 
 
 		/**
-		* Sets $scope.relatedEntityCanBeCreated and $scoperelatedEntityCanBeEdited
-		* by using the permissions (OPTIONS call) and the passed relationInteractive 
-		* attribute
-		*/
+		 * Sets $scope.relatedEntityCanBeCreated and $scoperelatedEntityCanBeEdited
+		 * by using the permissions (OPTIONS call) and the passed relationInteractive
+		 * attribute
+		 *
+		 * @todo: This is not fully correct, since the relation needs to to be checked with regard to the parent entity
+		 */
 		self.setRelatedEntityPermissions = function() {
 
 			return self.getOptions()
@@ -113,15 +162,18 @@
 						return;
 					}
 
-					if( data.permissions.create && data.permissions.create.allowed && $attrs.relationInteractive ) {
+					if( data.permissions.createOrUpdate === true ) {
 						$scope.relatedEntityCanBeCreated = true;
+						self.canCreateRelatedEntity = true;
 					}
 
-					if( data.permissions.update && data.permissions.update.allowed && $attrs.relationInteractive ) {
+					if( data.permissions.update === true ) {
 						$scope.relatedEntityCanBeEdited = true;
+						self.canEditRelatedEntity = true;
 					}
 
 					console.log( 'RelationInputController: Rights for ' + self.entityUrl + ': Create ' + $scope.relatedEntityCanBeCreated + ', edit: ' + $scope.relatedEntityCanBeCreated );
+					self.optionsData = data;
 
 				}, function( err ) {
 					// Nothing to do
@@ -129,45 +181,59 @@
 
 		};
 
+		self.relatedEntityCanBeCreated = function(){
+			return self.isInteractive === true
+					&& self.disableNew !== true
+					&& self.canCreateRelatedEntity === true;
+		};
+
+		self.relatedEntityCanBeEdited = function(){
+			return self.isInteractive === true
+					&& self.disableEdit !== true
+					&& self.canEditRelatedEntity === true;
+		};
+
+		self.relationCanBeRemoved = function(){
+			return  self.isReadonly !== true
+					&& self.disableRemove !== true
+					&& self.deletable === true;
+		};
+
+		self.relationCanBeCreated = function(){
+			return self.isReadonly !== true
+					&& self.creatable === true;
+		};
+
 
 		/**
-		* Get OPTIONS for self.entityUrl. Needed to read the write/edit permissions (and to check if 
+		* Get OPTIONS for self.entityUrl. Needed to read the write/edit permissions (and to check if
 		* edit/create symbols should be displayed).
 		*/
 		self.getOptions = function() {
-
-			return APIWrapperService.request( {
-				method			: 'OPTIONS'
-				, url			: '/' + self.entityUrl
-			} )
+			if(self.optionsData) return $q.when(self.optionsData);
+			return APIWrapperService.getOptions('/' + self.entityUrl)
 			.then( function( data ) {
 				return data;
 			}, function( err ) {
-				// Error does not really matter – we just won't display the create/edit tags
+				// Error does not really matter – we just won't display the create/edit tags
 				console.error( 'RelationInputController: Could not get permission data: ' + JSON.stringify( err ) );
 				return $q.reject( err );
 			} );
 
 		};
 
-
-
-
-
-
-
 		//
 		// Change of entities (entities were added or removed)
 		// -> Update model
 		//
 
-		// Make modelValue available to UI so that 
+		// Make modelValue available to UI so that
 		// selected-entities can display the selected entities
 		// But keep in self so that child directives may access it
 
 		self.addRelation = function( entity ) {
 
-			console.log( 'RelationInputController: Add relation %o', entity );			
+			console.log( 'RelationInputController: Add relation %o', entity );
 
 			// Update entities (will be displayed in selected-entities)
 			// Update model
@@ -180,9 +246,6 @@
 				self.entities = angular.isArray( self.entities ) ? self.entities : [];
 				self.entities.push( entity );
 			}
-
-			//$scope.$broadcast( 'entitiesUpdated', self.entities );
-
 		};
 
 
@@ -198,26 +261,11 @@
 			else {
 				self.entities = [];
 			}
-
-			//$scope.$broadcast( 'entitiesUpdated', self.entities );
-
 		};
-
-
-
-
-
-
-
-
-
-
 
 		//
 		// Select fields
 		//
-
-
 		self.setOpen = function( isOpen ) {
 
 			// Set private variable
@@ -255,14 +303,14 @@
 
 
 
-		// 
+		//
 		// Event Listeners
 		//
 
 		// Watch for events, called from within init
 		self.setupEventListeners = function() {
 
-			// Open & close: 
+			// Open & close:
 			// Watch for events here (instead of suggestion), as most events happen
 			// on this directive's element (and not the one of suggestion)
 
@@ -296,10 +344,10 @@
 		*/
 		function setupInputBlurHandler() {
 
-			// As the input[type=text] is added in the current loop, it's not yet available in the dom. 
-			// Add watcher on the next loop. 
+			// As the input[type=text] is added in the current loop, it's not yet available in the dom.
+			// Add watcher on the next loop.
 			setTimeout( function() {
-			
+
 				// See if tab was pressed. Don't fire on blur, as blur usually (but not always!) fires before the click on a
 				// suggestion and adding suggestion by the mouse will therefore not work (the suggestion list is being hidden
 				// before it can be clicked)
@@ -309,11 +357,11 @@
 						return true;
 					}
 
-					// Now, that's complicated and dirty: 
-					// - If shiftKey was pressed (focus previous element): Previous input will be the tab-catcher, the 
-					//   suggestion list will therefore be displayed again. Use a timeout. 
+					// Now, that's complicated and dirty:
+					// - If shiftKey was pressed (focus previous element): Previous input will be the tab-catcher, the
+					//   suggestion list will therefore be displayed again. Use a timeout.
 					// - If shiftKey was _not_ pressed, straightly go to the next element. Using a timeout here messes things
-					//   up, focus gets lost. 
+					//   up, focus gets lost.
 					if( ev.shiftKey ) {
 						setTimeout( function() {
 							$scope.$apply( function() {
@@ -384,7 +432,7 @@
 		return {
 			require			: [ 'relationInputSuggestions', '^relationInput' ]
 			, link			: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
 			}
 			, controller	: 'RelationInputSuggestionsController'
 			, replace		: true
@@ -392,7 +440,17 @@
 
 	} ] )
 
-	.controller( 'RelationInputSuggestionsController', [ '$scope', '$rootScope', '$compile', '$templateCache', 'APIWrapperService', 'RelationInputService', function( $scope, $rootScope, $compile, $templateCache, APIWrapperService, RelationInputService ) {
+	.controller( 'RelationInputSuggestionsController' , [
+
+		  '$scope'
+		, '$rootScope'
+		, '$compile'
+		, '$templateCache'
+		, '$timeout'
+		, 'APIWrapperService'
+		, 'RelationInputService'
+
+		, function( $scope, $rootScope, $compile, $templateCache, $timeout, APIWrapperService, RelationInputService ) {
 
 		var self = this
 			, element
@@ -411,7 +469,7 @@
 
 
 
-		// Holds the data that is displayed if no query was entered (default values). 
+		// Holds the data that is displayed if no query was entered (default values).
 		// Data is gotten when relation-input is being initialized.
 		$scope.emptyQueryResults = undefined;
 
@@ -420,16 +478,19 @@
 		// Seach query
 		//
 
-		$scope.searchQuery	= undefined;
+		$scope.searchQuery	= {};
 
-		$scope.$watch( 'searchQuery', function( newValue ) {
-			console.log( 'RelationInputSuggestionsController: searchQuery changed to %o', $scope.searchQuery );
-
-			// Init: Don't get data instantly as it will slow down the UI; wait for 1–2 secs. 
+		$scope.$watch( 'searchQuery.value', function( newValue ) {
+			var timeout = 1000 + Math.round( Math.random() * 2000 );
+			console.log( 'RelationInputSuggestionsController: searchQuery changed to %o', $scope.searchQuery.value );
+			// Init: Don't get data instantly as it will slow down the UI; wait for 1–2 secs.
 			if( !newValue ) {
-				setTimeout( function() {
-					self.getData( newValue );
-				}, 1000 + Math.round( Math.random() * 2000 ) );
+				if($scope.emptyQueryResults) {
+					timeout = 0;
+				}
+				$timeout( function() {
+					return self.getData( newValue );
+				}, timeout );
 			}
 
 			// Not init: Search instantly.
@@ -472,10 +533,10 @@
 
 
 			// Reset value of input and searchQuery
-			$scope.searchQuery		= '';
+			$scope.searchQuery.value		= '';
 			element.find( 'input' ).val( '' );
 
-			// If it's a single input, go to the next field. 
+			// If it's a single input, go to the next field.
 			if( !relationInputController.isMultiSelect ) {
 				relationInputController.setOpen( false );
 			}
@@ -541,23 +602,14 @@
 			var open = relationInputController.isOpen();
 			if( open ) {
 				console.log( 'RelationInputSuggestionsController: Is open; focus input.' );
-				setTimeout( function() {
+				$timeout( function() {
 					var input = element.find( 'input' );
 					input.focus();
 					console.log( 'RelationInputSuggestionsController: Focussed input %o.', input );
-				}, 100 );
+				}, 100);
 			}
 
 		} );
-
-
-
-
-
-
-
-
-
 
 		//
 		// Render Template
@@ -566,7 +618,7 @@
 
 		self.renderTemplate = function() {
 
-			// resultTemplate: replace [ name ] with {{ result.name }}
+			// resultTemplate: replace [ name ] with {{ result.name }}
 			// We can't use {{}} when template is passed, as it will be rendered and {{}} will be removed
 			// if we have to $compile the code first (see autoRelationInputDirecitve)
 			var resultTpl = relationInputController.searchResultTemplate;
@@ -638,7 +690,7 @@
 				}
 			}
 
-			if( currentIndex === undefined || ( direction === -1 && currentIndex === 0 ) || ( direction === 1 && currentIndex === $scope.results.length - 1 ) ) {
+			if( currentIndex === undefined || ( direction === -1 && currentIndex === 0 ) || ( direction === 1 && currentIndex === $scope.results.length - 1 ) ) {
 				return;
 			}
 
@@ -650,7 +702,7 @@
 
 		// User presses enter
 		self.addSelected = function( ev ) {
-			
+
 			ev.preventDefault();
 			if( !$scope.selected ) {
 				return;
@@ -677,12 +729,13 @@
 
 
 			// No search query was entered, but emptyQueryResults was set before: No need to make a call,
-			// just display the results for empty queries gotten on init. 
+			// just display the results for empty queries gotten on init.
 			if( !query && $scope.emptyQueryResults ) {
-
-				// Clone data (we don't want emptyQueryResults to be changed whenever data changes)
-				$scope.results = $scope.emptyQueryResults.slice( 0 );
-				self.filterResults();
+				$scope.$apply(function(){
+					// Clone data (we don't want emptyQueryResults to be changed whenever data changes)
+					$scope.results = $scope.emptyQueryResults.slice( 0 );
+					self.filterResults();
+				});
 
 				return;
 
@@ -696,18 +749,21 @@
 			// COMPOSE HEADER FIELDS
 			var headers		= {
 				range		: '0-' + relationInputController.resultCount
-			};
+				}
+				, filters = relationInputController.filters ? relationInputController.filters.slice(0) : [];
 
 			// Filter header
 			if( query ) {
-	
-				var filterField			= relationInputController.searchField
-					, filter			= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')'; // ;;: Unicode hack
 
-				headers.filter			= filter;
+				var   filterField		= relationInputController.searchField
+					  // The ';;' prefix is an unicode hack to prevent the server from stripping stuff
+					, baseFilter		= ';;' + filterField + '=like(\'' + encodeURIComponent( query + '%' ) + '\')';
 
+				filters.unshift(baseFilter);
 			}
-			
+
+			if(filters.length) headers.filter = filters.join(', ');
+
 			// Select header
 			var selectFields			= self.getSelectFields();
 			if( selectFields && selectFields.length ) {
@@ -751,7 +807,6 @@
 		* Get select fields from <li>'s content
 		*/
 		self.getSelectFields = function() {
-
 			var tpl = relationInputController.searchResultTemplate;
 
 			if( !tpl ) {
@@ -787,11 +842,11 @@
 					for( var j = $scope.results.length - 1; j >= 0; j-- ) {
 
 						// id missing
-						if( !$scope.results[ j ].id || !selected[ i ].id ) {
+						if( !$scope.results[ j ].id || !selected[ i ].id ) {
 							continue;
 						}
 
-						if( $scope.results[ j ].id === selected[ i ].id ) {
+						if( $scope.results[ j ].id === selected[ i ].id ) {
 							$scope.results.splice( j, 1 );
 							removedCount++;
 						}
@@ -816,14 +871,6 @@
 
 	} ] )
 
-
-
-
-
-
-
-
-
 	.directive( 'relationInputSelectedEntities', [ function() {
 		return {
 			link			: function( scope, element, attrs, ctrl ) {
@@ -832,27 +879,22 @@
 			, controller	: 'RelationInputSelectedEntitiesController'
 			, require		: [ 'relationInputSelectedEntities', '^relationInput' ]
 			, templateUrl	: 'relationInputSelectedEntitiesTemplate.html'
-			, replace		: true
+			, scope         : true
 		};
 	} ] )
 
 
-	.controller( 'RelationInputSelectedEntitiesController', [ '$scope', '$state', '$templateCache', '$compile', function( $scope, $state, $templateCache, $compile ) {
+	.controller( 'RelationInputSelectedEntitiesController'
+		, [
+			  '$scope'
+			, '$state'
+			, '$templateCache'
+			, '$compile'
+			, function( $scope, $state, $templateCache, $compile ) {
 
 		var self = this
 			, element
 			, relationInputController;
-
-
-		$scope.visitEntity = function( ev, entity ) {
-			ev.preventDefault();
-			$state.go( 'app.detail', { entityName: $scope.newEntityUrl, entityId: entity.id } );
-		};
-
-		$scope.createEntity = function( ev ) {
-			ev.preventDefault();
-			$state.go( 'app.detail', { entityName: $scope.newEntityUrl, entityId: 'new' } );
-		};
 
 
 		$scope.removeEntity = function( ev, entity ) {
@@ -896,12 +938,13 @@
 
 
 		/**
-		* Listens to focus, blur and click events, propagates them (to RelationInputController). 
+		* Listens to focus, blur and click events, propagates them (to RelationInputController).
 		* They can't be listened to directly in the RelationInputController, as renderTemplate() is called
 		* _after_ the eventListener setup function of RelationInputController
+		 *
+		 * todo: disable the listeners in the controller if the required permissions are not present
 		*/
 		self.setupEventListeners = function() {
-
 			// Focus on (hidden) input: Show suggestions
 			element.find( 'input' ).focus( function() {
 				console.log( 'RelationInputSelectedEntitiesController: (Hidden) input focussed.' );
@@ -919,8 +962,6 @@
 
 	} ] )
 
-
-
 	/**
 	* Small services that need to be accessible from all directives/controllers
 	*/
@@ -932,14 +973,14 @@
 			* Extracts select header fields from a template that is used for
 			* - the suggestions
 			* - the selected entities
-			* Template uses syntax like [[ select[0].subselect | filter ]] (basically replaces
+			* Template uses syntax like [[ select[0].subselect | filter ]] (basically replaces
 			* the angular {{ brackets with [[ )
 			*
 			* @return <Array>		Array of fields to be selected on GET call (as string)
 			*/
 			extractSelectFields: function( template ) {
-			
-				// Split at [ 
+
+				// Split at [
 				var tplSplit		= template.split( '[[' ).slice( 1 )
 				// Fields to select (e.g. 'eventData.name')
 					, selectFields	= [];
@@ -986,37 +1027,39 @@
 					'<div data-relation-input-selected-entities></div>' +
 					'<div data-relation-input-suggestions></div>' +
 					// Add new entity
-					'<div clearfix data-ng-if=\'relatedEntityCanBeCreated\'>' +
-						'<button class=\'add-entity\' data-ng-click=\'createEntity($event)\'><span class=\'fa fa-plus\'></span> New</button>' +
+					'<div clearfix data-ng-if="relationInput.relatedEntityCanBeCreated()">' +
+						//'<a tabindex=\'-1\' class="add-entity" ng-href="#" ng-click="visitEntity($event)"><span class=\'fa fa-plus\'></span> New</a>' +
+						'<a tabindex=\'-1\' class="add-entity" target=\'_blank\' data-ui-sref="app.detail({ entityName : relationInput.entityName , entityId : relationInput.getId() })"><span class="fa fa-plus"></span> New</a>' +
 					'</div>' +
 				'</div>' +
 			'</div>'
 		);
 
-
-
 		$templateCache.put( 'relationInputSelectedEntitiesTemplate.html',
-			'<div class=\'selected-entities\' data-ng-class=\'{ "single-select": !isMultiSelect }\'>' +
-				'<input type=\'text\' />' + // catch [tab]
+			'<div class="selected-entities" data-ng-class=\'{ "single-select": !isMultiSelect, "disabled": !relationInput.relationCanBeCreated() }\'>' +
+				'<input type="text"/>' + // catch [tab]
 				'<ul>' +
 					// use result for the loop as in the suggestion directive so that we may use the same template
-					'<li data-ng-repeat=\'result in relationInput.entities\'>' +
+					'<li data-ng-repeat="result in relationInput.entities">' +
 						'<span><!-- see renderTemplate() --></span>' +
 						// Edit
-						'<button data-ng-if=\'relatedEntityCanBeEdited\' data-ng-click=\'visitEntity($event, result)\' class=\'badge\'><span class=\'fa fa-pencil\'></span></button>' +
+						'<a data-ng-if="relationInput.relatedEntityCanBeEdited()" ui-sref="app.detail({entityName: relationInput.entityName, entityId: result.id})" target="_blank" class="badge"><span class="fa fa-pencil"></span></a>' +
 						// Delete
-						'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
+						'<button type="button" data-ng-if="relationInput.relationCanBeRemoved()" data-ng-click="removeEntity($event,result)">&times;</button>' +
 					'</li>' +
 				'</ul>' +
-				'<span class=\'caret\'></span>' +
+				'<span class="caret"></span>' +
 			'</div>'
 		);
 
 
-
+		/**
+		 * todo: make the debounce configurable
+		 */
 		$templateCache.put( 'relationInputSuggestionsTemplate.html',
-			'<div class=\'entity-suggestions dropdown-menu\' style=\'display:inherit;\' data-ng-show=\'isOpen()\'>' +  // display:inherit: overwrite bootstrap's .dropdown-menu
-				'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
+			// display:inherit: overwrite bootstrap's .dropdown-menu
+			'<div class="entity-suggestions dropdown-menu" style="display:inherit;" data-ng-show="isOpen() && relationInput.relationCanBeCreated()"> ' +
+				'<input type="text" class="form-control" data-ng-model="searchQuery.value" data-ng-model-options=\'{ "debounce" : 200 }\'/>' +
 				'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
 					'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
 				'</div>' +
@@ -1027,8 +1070,6 @@
 				'</div>' +
 			'</div>'
 		);
-
-
 
 	} ] );
 
