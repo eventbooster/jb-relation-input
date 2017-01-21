@@ -10,6 +10,8 @@
   color: #337ab7;
   font-size: 0.7em;
   margin-left: 10px;
+  background-color: transparent;
+  border: 0;
 }
 .relation-select .selected-entities {
   /* taken from for forms.less, .form-control */

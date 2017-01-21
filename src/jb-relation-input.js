@@ -837,7 +837,7 @@
 	} ] )
 
 
-	.controller( 'RelationInputSelectedEntitiesController', [ '$scope', '$location', '$templateCache', '$compile', function( $scope, $location, $templateCache, $compile ) {
+	.controller( 'RelationInputSelectedEntitiesController', [ '$scope', '$state', '$templateCache', '$compile', function( $scope, $state, $templateCache, $compile ) {
 
 		var self = this
 			, element
@@ -846,7 +846,12 @@
 
 		$scope.visitEntity = function( ev, entity ) {
 			ev.preventDefault();
-			$location.path( $scope.newEntityUrl + '/' + entity.id );
+			$state.go( 'app.detail', { entityName: $scope.newEntityUrl, entityId: entity.id } );
+		};
+
+		$scope.createEntity = function( ev ) {
+			ev.preventDefault();
+			$state.go( 'app.detail', { entityName: $scope.newEntityUrl, entityId: 'new' } );
 		};
 
 
@@ -982,7 +987,7 @@
 					'<div data-relation-input-suggestions></div>' +
 					// Add new entity
 					'<div clearfix data-ng-if=\'relatedEntityCanBeCreated\'>' +
-						'<a tabindex=\'-1\' class=\'add-entity\' data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
+						'<button class=\'add-entity\' data-ng-click=\'createEntity($event)\'><span class=\'fa fa-plus\'></span> New</button>' +
 					'</div>' +
 				'</div>' +
 			'</div>'
