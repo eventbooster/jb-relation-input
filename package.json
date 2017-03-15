@@ -1,6 +1,5 @@
 {
   "name": "jb-relation-input",
-  "version": "0.0.1",
   "private": false,
   "devDependencies": {
     "gulp": "^3.8.11",
