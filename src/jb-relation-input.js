@@ -160,7 +160,7 @@
         .then( function( data ) {
 
           if( !data.permissions ) {
-            console.warn( 'RelationInputController: permissions property missing in OPTIONS call response', JSON.stringify( permissions ) );
+            console.warn( 'RelationInputController: permissions property missing in OPTIONS call response', JSON.stringify( data.permissions ) );
             return;
           }
 
