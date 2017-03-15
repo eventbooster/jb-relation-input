@@ -158,7 +158,7 @@
 				.then( function( data ) {
 
 					if( !data.permissions ) {
-						console.warn( 'RelationInputController: permissions property missing in OPTIONS call response', JSON.stringify( permissions ) );
+						console.warn( 'RelationInputController: permissions property missing in OPTIONS call response', JSON.stringify( data.permissions ) );
 						return;
 					}
 
@@ -200,6 +200,7 @@
 		};
 
 		self.relationCanBeCreated = function(){
+			console.log('RelationInput: Can be created? readonly %o, creatable %o', self.isReadonly, self.creatable);
 			return self.isReadonly !== true
 					&& self.creatable === true;
 		};
