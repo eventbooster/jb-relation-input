@@ -755,14 +755,20 @@
       // Filter header
 
       if( query ) {
-        var filterQuery = "like('" + encodeURIComponent( '%' + query + '%') + "')";
-        var filterField = relationInputController.searchField;
+        var filterField = relationInputController.searchField
+          , filterQuery;
+
+        if (filterField === 'id') filterQuery = query;
+        else filterQuery = "like('" + encodeURIComponent( '%' + query + '%') + "')";
+        
+
+
         var extendedQueryString;
         var baseFilter;
 
         if(relationInputController.enableFulltextSearch === true){
           extendedQueryString = query.trim().split(/\s+/).map(function(item){
-            return "'" + encodeURIComponent(item) + "'"
+            return "'" + encodeURIComponent(item) + "'";
           }).join(' , ');
           filterQuery = "fulltext(" + extendedQueryString +")";
         }
