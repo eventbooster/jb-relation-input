@@ -164,7 +164,7 @@
             return;
           }
 
-          if( data.permissions.createOrUpdate === true ) {
+          if( data.permissions.create === true ) {
             $scope.relatedEntityCanBeCreated = true;
             self.canCreateRelatedEntity = true;
           }
